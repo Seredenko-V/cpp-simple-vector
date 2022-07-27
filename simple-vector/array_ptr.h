@@ -51,7 +51,7 @@ public:
         if (this->raw_ptr_ == rvalue.raw_ptr_) {
             return *this;
         }
-        this->raw_ptr_ = std::move(rvalue.raw_ptr_);
+        this->swap(rvalue);
         rvalue.raw_ptr_ = nullptr;
         return *this;
     }
@@ -86,9 +86,7 @@ public:
 
     // Обменивается значениям указателя на массив с объектом other
     void swap(ArrayPtr& other) noexcept {
-        Type* tmp_copy = this->raw_ptr_;
-        this->raw_ptr_ = other.raw_ptr_;
-        other.raw_ptr_ = tmp_copy;
+        std::swap(this->raw_ptr_, other.raw_ptr_);
     }
 
 private:

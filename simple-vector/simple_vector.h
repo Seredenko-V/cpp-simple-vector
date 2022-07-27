@@ -110,11 +110,13 @@ public:
 
     // Возвращает ссылку на элемент с индексом index
     Type& operator[](size_t index) noexcept {
+        assert(index < size_);
         return simple_vector_[index];
     }
 
     // Возвращает константную ссылку на элемент с индексом index
     const Type& operator[](size_t index) const noexcept {
+        assert(index < size_);
         return simple_vector_[index];
     }
 
@@ -154,8 +156,7 @@ public:
                 }
                 *this = std::move(new_vector);
                 this->capacity_ = std::max(this->capacity_ * 2, new_size);
-            }
-            else {
+            } else {
                 for (size_t i = size_; i < new_size; ++i) {
                     simple_vector_[i] = std::move(Type()); // дефолтные значения после уже записанных
                 }
@@ -211,12 +212,11 @@ public:
 
     // Перемещающий оператор присваивания
     SimpleVector& operator=(SimpleVector&& rvalue) {
-        // НЕ ПОЙМУ КАК СДЕЛАТЬ ПРАВИЛЬНО ОПЕРАТОР СРАВНЕНИЯ, ТРЕНАЖЕР НЕ ПРОПУСКАЛ
-        //if (*this == rvalue) {
-        //    return *this;
-        //}
-        this->simple_vector_ = std::move(rvalue.simple_vector_);
-        this->size_ = std::move(rvalue.size_);
+        if (this == &rvalue) {
+            return *this;
+        }
+        this->simple_vector_.swap(rvalue.simple_vector_);
+        std::swap(this->size_, rvalue.size_);
         std::exchange(rvalue.size_, 0);
         return *this;
     }
@@ -238,6 +238,7 @@ public:
     // Если перед вставкой значения вектор был заполнен полностью,
     // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
     Iterator Insert(ConstIterator pos, const Type& value) {
+        assert(pos >= begin() && pos <= end());
         if (capacity_ == 0) {
             this->PushBack(value);
             return this->begin();
@@ -254,8 +255,7 @@ public:
             capacity_ *= 2;
             simple_vector_.swap(tmp_arr);
             return &simple_vector_[position_new_element];
-        }
-        else {
+        } else {
             std::copy_backward(new_pos, this->end(), std::next(this->end()));
             simple_vector_[position_new_element] = value;
             ++size_;
@@ -264,6 +264,7 @@ public:
     }
 
     Iterator Insert(ConstIterator pos, Type&& value) {
+        assert(pos >= begin() && pos <= end());
         if (capacity_ == 0) {
             this->PushBack(std::move(value));
             return this->begin();
@@ -280,8 +281,7 @@ public:
             capacity_ *= 2;
             simple_vector_ = std::move(tmp_arr);
             return &simple_vector_[position_new_element];
-        }
-        else {
+        } else {
             std::move_backward(new_pos, this->end(), std::next(this->end()));
             simple_vector_[position_new_element] = std::move(value);
             ++size_;
@@ -299,12 +299,14 @@ public:
 
     // Удаляет элемент вектора в указанной позиции
     Iterator Erase(ConstIterator pos) {
+        assert(pos >= begin() && pos < end());
         std::copy(std::next(pos), this->cend(), const_cast<Iterator>(pos));
         --size_;
         return const_cast<Iterator>(pos);
     }
 
     Iterator Erase(Iterator pos) {
+        assert(pos >= begin() && pos < end());
         std::move(std::next(pos), this->end(), const_cast<Iterator>(pos));
         --size_;
         return const_cast<Iterator>(pos);
@@ -338,7 +340,6 @@ inline bool operator==(const SimpleVector<Type>& lhs, const SimpleVector<Type>& 
     return (lhs.GetSize() == rhs.GetSize() && std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end()));
 }
 
-// КАК ПРАВИЛЬНО СДЕЛАТЬ ОПЕРАТОР СРАВНЕНИЯ ДЛЯ НЕКОПИРУЕМЫХ ОБЪЕКТОВ?
 template <typename Type>
 inline bool operator==(SimpleVector<Type>&& lhs, SimpleVector<Type>&& rhs) {
     return (lhs.GetSize() == rhs.GetSize() && std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end()));
