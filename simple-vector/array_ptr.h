@@ -52,7 +52,6 @@ public:
             return *this;
         }
         this->swap(rvalue);
-        rvalue.raw_ptr_ = nullptr;
         return *this;
     }
 
