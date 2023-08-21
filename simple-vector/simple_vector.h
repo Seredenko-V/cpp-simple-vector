@@ -19,6 +19,10 @@ public:
     size_t capacity_to_reserve_ = 0;
 };
 
+inline ReserveProxyObj Reserve(size_t capacity_to_reserve) {
+    return ReserveProxyObj(capacity_to_reserve);
+}
+
 template <typename Type>
 class SimpleVector {
 public:
@@ -35,61 +39,20 @@ public:
     };
 
     // Создаёт вектор из size элементов, инициализированных значением value
-    SimpleVector(size_t size, Type&& value)
-        : size_(size)
-        , capacity_(size)
-        , simple_vector_(size) {
-        ArrayPtr<Type> tmp_vector(size);
-        for (size_t i = 0; i < size; ++i) {
-            tmp_vector[i] = std::move(value);
-        }
-        simple_vector_ = std::move(tmp_vector);
-    }
-
-    SimpleVector(size_t size, const Type& value)
-        : size_(size)
-        , capacity_(size)
-        , simple_vector_(size) {
-        ArrayPtr<Type> tmp_vector(size);
-        std::fill(tmp_vector.Get(), &tmp_vector[size], value);
-        simple_vector_.swap(tmp_vector);
-    }
+    SimpleVector(size_t size, Type&& value);
+    SimpleVector(size_t size, const Type& value);
 
     // Создаёт вектор из std::initializer_list
-    SimpleVector(std::initializer_list<Type> init)
-        : size_(init.size())
-        , capacity_(init.size())
-        , simple_vector_(init.size()) {
-        ArrayPtr<Type> tmp_vector(size_);
-        // вместо tmp_vector.Get() можно использовать &tmp_vector[0]
-        std::move(init.begin(), init.end(), tmp_vector.Get());
-        simple_vector_ = std::move(tmp_vector);
-    }
+    SimpleVector(std::initializer_list<Type> init);
 
     // Конструктор копирования
-    SimpleVector(const SimpleVector& other)
-        : size_(other.GetSize())
-        , capacity_(other.GetCapacity())
-        , simple_vector_(other.GetSize()) {
-        SimpleVector tmp_vector(size_);
-        std::copy(other.begin(), other.end(), tmp_vector.begin());
-        simple_vector_.swap(tmp_vector.simple_vector_);
-    }
+    SimpleVector(const SimpleVector& other);
 
     // Конструктор перемещения
-    SimpleVector(SimpleVector&& rvalue)
-        : size_(rvalue.GetSize())
-        , capacity_(rvalue.GetCapacity()) {
-        simple_vector_.swap(rvalue.simple_vector_);
-        std::exchange(rvalue.capacity_, 0);
-        std::exchange(rvalue.size_, 0);
-    }
+    SimpleVector(SimpleVector&& rvalue);
 
     // Конструктор резервирования
-    SimpleVector(ReserveProxyObj reserved_vector)
-        : capacity_(reserved_vector.capacity_to_reserve_)
-        , simple_vector_(reserved_vector.capacity_to_reserve_) {
-    }
+    SimpleVector(ReserveProxyObj reserved_vector);
 
     ~SimpleVector() = default;
 
@@ -145,25 +108,7 @@ public:
 
     // Изменяет размер массива.
     // При увеличении размера новые элементы получают значение по умолчанию для типа Type
-    void Resize(size_t new_size) {
-        if (new_size > size_) {
-            if (new_size > capacity_) {
-                SimpleVector new_vector(std::max(this->capacity_ * 2, new_size));
-                new_vector.size_ = new_size;
-                std::move(this->begin(), this->end(), new_vector.begin());
-                for (size_t i = size_; i < new_size; ++i) {
-                    new_vector.simple_vector_[i] = std::move(Type());
-                }
-                *this = std::move(new_vector);
-                this->capacity_ = std::max(this->capacity_ * 2, new_size);
-            } else {
-                for (size_t i = size_; i < new_size; ++i) {
-                    simple_vector_[i] = std::move(Type()); // дефолтные значения после уже записанных
-                }
-            }
-        }
-        this->size_ = new_size;
-    }
+    void Resize(size_t new_size);
 
     // Возвращает итератор на начало массива
     // Для пустого массива может быть равен (или не равен) nullptr
@@ -201,25 +146,10 @@ public:
         return &simple_vector_[size_];
     }
 
-    SimpleVector& operator=(const SimpleVector& rhs) {
-        if (*this == rhs) {
-            return *this;
-        }
-        SimpleVector tmp_vector(rhs);
-        this->swap(tmp_vector);
-        return *this;
-    }
+    SimpleVector& operator=(const SimpleVector& rhs);
 
     // Перемещающий оператор присваивания
-    SimpleVector& operator=(SimpleVector&& rvalue) {
-        if (this == &rvalue) {
-            return *this;
-        }
-        this->simple_vector_.swap(rvalue.simple_vector_);
-        std::swap(this->size_, rvalue.size_);
-        std::exchange(rvalue.size_, 0);
-        return *this;
-    }
+    SimpleVector& operator=(SimpleVector&& rvalue);
 
     // Добавляет элемент в конец вектора
     // При нехватке места увеличивает вдвое вместимость вектора
@@ -237,57 +167,8 @@ public:
     // Возвращает итератор на вставленное значение
     // Если перед вставкой значения вектор был заполнен полностью,
     // вместимость вектора должна увеличиться вдвое, а для вектора вместимостью 0 стать равной 1
-    Iterator Insert(ConstIterator pos, const Type& value) {
-        assert(pos >= begin() && pos <= end());
-        if (capacity_ == 0) {
-            this->PushBack(value);
-            return this->begin();
-        }
-        size_t position_new_element = std::distance(this->cbegin(), pos);
-        Iterator new_pos = this->begin() + position_new_element; // текущего вектора
-        if (size_ == capacity_) {
-            assert(size_ <= capacity_);
-            ArrayPtr<Type> tmp_arr(capacity_ * 2);
-            std::copy(begin(), new_pos, tmp_arr.Get());
-            tmp_arr[position_new_element] = value;
-            std::copy_backward(new_pos, end(), tmp_arr.Get() + size_ + 1);
-            ++size_;
-            capacity_ *= 2;
-            simple_vector_.swap(tmp_arr);
-            return &simple_vector_[position_new_element];
-        } else {
-            std::copy_backward(new_pos, this->end(), std::next(this->end()));
-            simple_vector_[position_new_element] = value;
-            ++size_;
-            return &simple_vector_[position_new_element];
-        }
-    }
-
-    Iterator Insert(ConstIterator pos, Type&& value) {
-        assert(pos >= begin() && pos <= end());
-        if (capacity_ == 0) {
-            this->PushBack(std::move(value));
-            return this->begin();
-        }
-        size_t position_new_element = std::distance(this->cbegin(), pos);
-        Iterator new_pos = this->begin() + position_new_element; // текущего вектора
-        if (size_ == capacity_) {
-            assert(size_ <= capacity_);
-            ArrayPtr<Type> tmp_arr(capacity_ * 2);
-            std::move(begin(), new_pos, tmp_arr.Get());
-            tmp_arr[position_new_element] = std::move(value);
-            std::move_backward(new_pos, end(), tmp_arr.Get() + size_ + 1);
-            ++size_;
-            capacity_ *= 2;
-            simple_vector_ = std::move(tmp_arr);
-            return &simple_vector_[position_new_element];
-        } else {
-            std::move_backward(new_pos, this->end(), std::next(this->end()));
-            simple_vector_[position_new_element] = std::move(value);
-            ++size_;
-            return &simple_vector_[position_new_element];
-        }
-    }
+    Iterator Insert(ConstIterator pos, const Type& value);
+    Iterator Insert(ConstIterator pos, Type&& value);
 
     // "Удаляет" последний элемент вектора. Вектор не должен быть пустым
     void PopBack() noexcept {
@@ -319,21 +200,181 @@ public:
         this->simple_vector_.swap(other.simple_vector_);
     }
 
-    void Reserve(size_t new_capacity) {
-        if (new_capacity <= capacity_) {
-            return;
-        }
-        SimpleVector tmp_vector(new_capacity);
-        std::move(begin(), end(), tmp_vector.begin());
-        simple_vector_ = std::move(tmp_vector.simple_vector_);
-        this->capacity_ = new_capacity;
-    }
+    void Reserve(size_t new_capacity);
 
 private:
     size_t size_ = 0;
     size_t capacity_ = 0;
     ArrayPtr<Type> simple_vector_;
 };
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(size_t size, Type&& value)
+    : size_(size)
+    , capacity_(size)
+    , simple_vector_(size) {
+    ArrayPtr<Type> tmp_vector(size);
+    for (size_t i = 0; i < size; ++i) {
+        tmp_vector[i] = std::move(value);
+    }
+    simple_vector_ = std::move(tmp_vector);
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(size_t size, const Type& value)
+    : size_(size)
+    , capacity_(size)
+    , simple_vector_(size) {
+    ArrayPtr<Type> tmp_vector(size);
+    std::fill(tmp_vector.Get(), &tmp_vector[size], value);
+    simple_vector_.swap(tmp_vector);
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(std::initializer_list<Type> init)
+    : size_(init.size())
+    , capacity_(init.size())
+    , simple_vector_(init.size()) {
+    ArrayPtr<Type> tmp_vector(size_);
+    // вместо tmp_vector.Get() можно использовать &tmp_vector[0]
+    std::move(init.begin(), init.end(), tmp_vector.Get());
+    simple_vector_ = std::move(tmp_vector);
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(const SimpleVector& other)
+    : size_(other.GetSize())
+    , capacity_(other.GetCapacity())
+    , simple_vector_(other.GetSize()) {
+    SimpleVector tmp_vector(size_);
+    std::copy(other.begin(), other.end(), tmp_vector.begin());
+    simple_vector_.swap(tmp_vector.simple_vector_);
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(SimpleVector&& rvalue)
+    : size_(rvalue.GetSize())
+    , capacity_(rvalue.GetCapacity()) {
+    simple_vector_.swap(rvalue.simple_vector_);
+    std::exchange(rvalue.capacity_, 0);
+    std::exchange(rvalue.size_, 0);
+}
+
+template <typename Type>
+SimpleVector<Type>::SimpleVector(ReserveProxyObj reserved_vector)
+    : capacity_(reserved_vector.capacity_to_reserve_)
+    , simple_vector_(reserved_vector.capacity_to_reserve_) {
+}
+
+template <typename Type>
+void SimpleVector<Type>::Resize(size_t new_size) {
+    if (new_size > size_) {
+        if (new_size > capacity_) {
+            SimpleVector new_vector(std::max(this->capacity_ * 2, new_size));
+            new_vector.size_ = new_size;
+            std::move(this->begin(), this->end(), new_vector.begin());
+            for (size_t i = size_; i < new_size; ++i) {
+                new_vector.simple_vector_[i] = std::move(Type());
+            }
+            *this = std::move(new_vector);
+            this->capacity_ = std::max(this->capacity_ * 2, new_size);
+        } else {
+            for (size_t i = size_; i < new_size; ++i) {
+                simple_vector_[i] = std::move(Type()); // дефолтные значения после уже записанных
+            }
+        }
+    }
+    this->size_ = new_size;
+}
+
+template <typename Type>
+SimpleVector<Type>& SimpleVector<Type>::operator=(const SimpleVector<Type>& rhs) {
+    if (*this == rhs) {
+        return *this;
+    }
+    if (rhs.IsEmpty()) {
+        Clear(); // Оптимизация для случая присваивания пустого вектора
+    }
+    SimpleVector tmp_vector(rhs);
+    this->swap(tmp_vector);
+    return *this;
+}
+
+template <typename Type>
+SimpleVector<Type>& SimpleVector<Type>::operator=(SimpleVector<Type>&& rvalue) {
+    if (this == &rvalue) {
+        return *this;
+    }
+    this->simple_vector_.swap(rvalue.simple_vector_);
+    std::swap(this->size_, rvalue.size_);
+    std::exchange(rvalue.size_, 0);
+    return *this;
+}
+
+template <typename Type>
+typename SimpleVector<Type>::Iterator SimpleVector<Type>::Insert(ConstIterator pos, const Type& value) {
+    assert(pos >= begin() && pos <= end());
+    if (capacity_ == 0) {
+        this->PushBack(value);
+        return this->begin();
+    }
+    size_t position_new_element = std::distance(this->cbegin(), pos);
+    Iterator new_pos = this->begin() + position_new_element; // текущего вектора
+    if (size_ == capacity_) {
+        assert(size_ <= capacity_);
+        ArrayPtr<Type> tmp_arr(capacity_ * 2);
+        std::copy(begin(), new_pos, tmp_arr.Get());
+        tmp_arr[position_new_element] = value;
+        std::copy_backward(new_pos, end(), tmp_arr.Get() + size_ + 1);
+        ++size_;
+        capacity_ *= 2;
+        simple_vector_.swap(tmp_arr);
+        return &simple_vector_[position_new_element];
+    } else {
+        std::copy_backward(new_pos, this->end(), std::next(this->end()));
+        simple_vector_[position_new_element] = value;
+        ++size_;
+        return &simple_vector_[position_new_element];
+    }
+}
+
+template <typename Type>
+typename SimpleVector<Type>::Iterator SimpleVector<Type>::Insert(ConstIterator pos, Type&& value) {
+    assert(pos >= begin() && pos <= end());
+    if (capacity_ == 0) {
+        this->PushBack(std::move(value));
+        return this->begin();
+    }
+    size_t position_new_element = std::distance(this->cbegin(), pos);
+    Iterator new_pos = this->begin() + position_new_element; // текущего вектора
+    if (size_ == capacity_) {
+        assert(size_ <= capacity_);
+        ArrayPtr<Type> tmp_arr(capacity_ * 2);
+        std::move(begin(), new_pos, tmp_arr.Get());
+        tmp_arr[position_new_element] = std::move(value);
+        std::move_backward(new_pos, end(), tmp_arr.Get() + size_ + 1);
+        ++size_;
+        capacity_ *= 2;
+        simple_vector_ = std::move(tmp_arr);
+        return &simple_vector_[position_new_element];
+    } else {
+        std::move_backward(new_pos, this->end(), std::next(this->end()));
+        simple_vector_[position_new_element] = std::move(value);
+        ++size_;
+        return &simple_vector_[position_new_element];
+    }
+}
+
+template <typename Type>
+void SimpleVector<Type>::Reserve(size_t new_capacity) {
+    if (new_capacity <= capacity_) {
+        return;
+    }
+    SimpleVector tmp_vector(new_capacity);
+    std::move(begin(), end(), tmp_vector.begin());
+    simple_vector_ = std::move(tmp_vector.simple_vector_);
+    this->capacity_ = new_capacity;
+}
 
 template <typename Type>
 inline bool operator==(const SimpleVector<Type>& lhs, const SimpleVector<Type>& rhs) {
@@ -370,6 +411,14 @@ inline bool operator>=(const SimpleVector<Type>& lhs, const SimpleVector<Type>& 
     return !(lhs < rhs);
 }
 
-ReserveProxyObj Reserve(size_t capacity_to_reserve) {
-    return ReserveProxyObj(capacity_to_reserve);
-}
+namespace tests {
+    void TestTemporaryObjConstructor();
+    void TestTemporaryObjOperator();
+    void TestNamedMoveConstructor();
+    void TestNamedMoveOperator();
+    void TestNoncopiableMoveConstructor();
+    void TestNoncopiablePushBack();
+    void TestNoncopiableInsert();
+    void TestNoncopiableErase();
+    void AllTests();
+} // namespace tests
