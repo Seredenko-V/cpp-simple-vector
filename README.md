@@ -10,4 +10,4 @@
 * C++17
 
 ## UML-диаграмма
-![UML](https://raw.githubusercontent.com/Seredenko-V/cpp-simple-vector/09702d933d2f5616c80858e0f400eb333f4ff5a8/uml-simple-vector.svg?token=AWESMYZCYG2DUZNHW66KZZDE4MA7Q "UML-diagram single-linked-list")
+![UML](https://raw.githubusercontent.com/Seredenko-V/cpp-simple-vector/06892519bcb94f244fbe8880da51e6f7500b60db/uml-simple-vector.svg?token=AWESMY7ZQTJZT6FTH6FZPG3E4MGBK "UML-diagram simple-vector")
